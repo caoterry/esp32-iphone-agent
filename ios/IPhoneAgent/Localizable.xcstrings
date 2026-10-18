@@ -1,6 +1,76 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Recommended": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐"
+          }
+        }
+      }
+    },
+    "Tested": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已测试"
+          }
+        }
+      }
+    },
+    "Custom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义"
+          }
+        }
+      }
+    },
+    "Choose Model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择模型"
+          }
+        }
+      }
+    },
+    "Choose Provider": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择服务商"
+          }
+        }
+      }
+    },
+    "Provider": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务商"
+          }
+        }
+      }
+    },
+    "Any OpenAI-compatible endpoint": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任意 OpenAI 兼容地址"
+          }
+        }
+      }
+    },
     "The board answered, but no new screen image arrived. Keep Screen Mirroring connected and try again.": {
       "localizations": {
         "zh-Hans": {

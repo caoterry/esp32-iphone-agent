@@ -2,16 +2,20 @@ import Foundation
 
 /// Presets only configure public endpoints. Users always supply their own credentials.
 enum ModelProvider: String, CaseIterable, Identifiable {
-    case openAI, gemini, qwen, qwenInternational, deepSeek, openRouter, others
+    case openAI, gemini, qwen, qwenInternational, deepSeek, openRouter, nvidia, nebius, hCompany, zhipu, others
     var id: String { rawValue }
     var title: String {
         switch self {
         case .openAI: return "OpenAI"
         case .gemini: return "Google Gemini"
-        case .qwen: return "Qwen · China"
+        case .qwen: return "Qwen"
         case .qwenInternational: return "Qwen · International"
         case .deepSeek: return "DeepSeek"
         case .openRouter: return "OpenRouter"
+        case .nvidia: return "NVIDIA"
+        case .nebius: return "Nebius"
+        case .hCompany: return "H Company"
+        case .zhipu: return "Zhipu GLM"
         case .others: return "Others"
         }
     }
@@ -23,6 +27,10 @@ enum ModelProvider: String, CaseIterable, Identifiable {
         case .qwen: return "https://dashscope.aliyuncs.com/compatible-mode/v1"
         case .qwenInternational: return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
         case .deepSeek: return "https://api.deepseek.com"
+        case .nvidia: return "https://integrate.api.nvidia.com/v1"
+        case .nebius: return "https://api.tokenfactory.nebius.com/v1"
+        case .hCompany: return "https://api.hcompany.ai/v1"
+        case .zhipu: return "https://open.bigmodel.cn/api/paas/v4"
         case .others: return ""
         }
     }
@@ -35,10 +43,33 @@ enum ModelProvider: String, CaseIterable, Identifiable {
         case .qwen: address = "https://bailian.console.aliyun.com/"
         case .qwenInternational: address = "https://modelstudio.console.alibabacloud.com/"
         case .deepSeek: address = "https://platform.deepseek.com/api_keys"
+        case .nvidia: address = "https://build.nvidia.com/settings/api-keys"
+        case .nebius: address = "https://tokenfactory.nebius.com/"
+        case .hCompany: address = "https://hub.hcompany.ai/"
+        case .zhipu: address = "https://open.bigmodel.cn/usercenter/apikeys"
         case .others: return nil
         }
         return URL(string: address)
     }
+    /// Monochrome mark for the provider list: an asset (Simple Icons), else a letter.
+    enum Logo { case asset(String), letter(String), symbol(String) }
+    var logo: Logo {
+        switch self {
+        case .openAI: return .asset("OpenAILogo")
+        case .gemini: return .asset("GeminiLogo")
+        case .qwen, .qwenInternational: return .asset("QwenLogo")
+        case .deepSeek: return .asset("DeepSeekLogo")
+        case .openRouter: return .asset("OpenRouterLogo")
+        case .nvidia: return .asset("NVIDIALogo")
+        case .nebius: return .letter("N")
+        case .hCompany: return .letter("H")
+        case .zhipu: return .letter("Z")
+        case .others: return .symbol("server.rack")
+        }
+    }
+    /// Shown first in the provider list (their tested model is preselected).
+    var recommended: Bool { TestedModels.list(for: self).contains { $0.recommended } }
+    var host: String { URL(string: baseURL)?.host ?? "" }
     static func infer(baseURL: String, model: String) -> Self {
         let base = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if base == openRouter.baseURL { return .openRouter }

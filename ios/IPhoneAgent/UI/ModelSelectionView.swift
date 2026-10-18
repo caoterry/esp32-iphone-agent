@@ -4,6 +4,7 @@ struct ModelSelectionView: View {
     @ObservedObject var settings: Settings
     @Binding var selection: String
     let allowsDefault: Bool
+    var onChoose: ((String) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
     @State private var customID = ""
@@ -18,14 +19,21 @@ struct ModelSelectionView: View {
         }
     }
 
+    private var tested: [TestedModel] { TestedModels.list(for: settings.provider).filter { matchesSearch($0.id) } }
+
+    /// The endpoint's list, without the tested models shown above it.
     private var matches: [String] {
-        let ids = Set(settings.models + (selection.isEmpty ? [] : [selection]))
-        return ids.filter { search.isEmpty || $0.localizedStandardContains(search)
-            || Self.displayName($0).localizedStandardContains(search) }.sorted()
+        let testedIDs = Set(TestedModels.list(for: settings.provider).map(\.id))
+        let ids = Set(settings.models + (selection.isEmpty ? [] : [selection])).subtracting(testedIDs)
+        return ids.filter(matchesSearch).sorted()
+    }
+
+    private func matchesSearch(_ id: String) -> Bool {
+        search.isEmpty || id.localizedStandardContains(search) || Self.displayName(id).localizedStandardContains(search)
     }
 
     var body: some View {
-        let visible = matches
+        let visible = matches, tested = tested
         NavigationStack {
             List {
                 if allowsDefault && search.isEmpty {
@@ -37,16 +45,21 @@ struct ModelSelectionView: View {
                     Button("Use Model ID") { choose(customID.trimmingCharacters(in: .whitespacesAndNewlines)) }
                         .disabled(customID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+                if !tested.isEmpty {
+                    Section("Tested") {
+                        ForEach(tested, id: \.id) { row($0.id, recommended: $0.recommended) }
+                    }
+                }
                 if settings.provider == .openRouter {
                     openRouterSections(visible)
-                } else {
+                } else if !visible.isEmpty {
                     Section("Models") {
                         ForEach(visible, id: \.self) { id in row(id) }
                     }
                 }
                 if settings.loadingModels {
                     ProgressView("Loading models…")
-                } else if visible.isEmpty {
+                } else if visible.isEmpty && tested.isEmpty {
                     if search.isEmpty {
                         ContentUnavailableView("No models loaded", systemImage: "list.bullet",
                                                description: Text("Refresh the list or enter a model ID below."))
@@ -97,7 +110,7 @@ struct ModelSelectionView: View {
         }
     }
 
-    private func row(_ id: String) -> some View {
+    private func row(_ id: String, recommended: Bool = false) -> some View {
         Button { choose(id) } label: {
             HStack {
                 VStack(alignment: .leading) {
@@ -107,6 +120,7 @@ struct ModelSelectionView: View {
                     }
                 }
                 Spacer()
+                if recommended { RecommendedBadge() }
                 if selection == id {
                     Image(systemName: "checkmark").accessibilityLabel("Selected")
                 }
@@ -119,7 +133,7 @@ struct ModelSelectionView: View {
     }
 
     private func choose(_ id: String) {
-        selection = id
+        if let onChoose, !id.isEmpty { onChoose(id) } else { selection = id }
         dismiss()
     }
 }

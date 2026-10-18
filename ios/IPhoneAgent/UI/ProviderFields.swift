@@ -6,13 +6,7 @@ struct ProviderFields: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            LabeledContent("Provider") {
-                Picker("Provider", selection: $settings.selectedProvider) {
-                    ForEach(ModelProvider.allCases) { provider in Text(verbatim: provider.title).tag(provider) }
-                }
-                .labelsHidden().pickerStyle(.menu).tint(.primary).lineLimit(1)
-            }
-            .frame(minHeight: 44)
+            ProviderPicker(settings: settings)
             Divider()
             if settings.provider == .others {
                 LabeledContent("Base URL") {
@@ -30,7 +24,8 @@ struct ProviderFields: View {
             .frame(minHeight: 44).padding(.vertical, Space.xs)
             Divider()
             ModelPicker(settings: settings, title: "Model", selection: $settings.model,
-                        automatic: String(localized: "Choose a model"), allowsDefault: false)
+                        automatic: String(localized: "Choose a model"), allowsDefault: false,
+                        onChoose: settings.chooseModel)
                 .frame(minHeight: 44).padding(.vertical, Space.xs)
             if AIConsent.store && settings.isConfigured {
                 Divider()

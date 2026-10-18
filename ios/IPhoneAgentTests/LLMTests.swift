@@ -41,6 +41,37 @@ final class StubProtocol: URLProtocol {
         XCTAssertEqual(ModelProvider.infer(baseURL: "https://api.openai.com/v1", model: "custom"), .openAI)
         XCTAssertEqual(ModelProvider.infer(baseURL: "http://192.168.1.4:8080/v1", model: "local"), .others)
         XCTAssertNotEqual(ModelProvider.qwen.baseURL, ModelProvider.qwenInternational.baseURL)
+        for p in [ModelProvider.nvidia, .nebius, .hCompany, .zhipu] {
+            XCTAssertEqual(ModelProvider.infer(baseURL: p.baseURL + "/", model: "x"), p)
+        }
+    }
+
+    func testTestedModelsCarryValidParametersAndTwoRecommended() {
+        let all = ModelProvider.allCases.flatMap { p in TestedModels.list(for: p).map { (p, $0) } }
+        for (_, m) in all {
+            XCTAssertNotNil(try? JSONSerialization.jsonObject(with: Data(m.extraBody.utf8)) as? [String: Any], m.id)
+        }
+        XCTAssertEqual(all.filter { $0.1.recommended }.map(\.1.id).sorted(), ["gemini-3.8-flash", "qwen3.8-flash"])
+        XCTAssertEqual(ModelProvider.allCases.filter(\.recommended), [.gemini, .qwen])
+    }
+
+    func testRecommendedProviderPreselectsItsTestedModel() {
+        let name = "tested-test-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = Settings(defaults: defaults, info: [:])
+        settings.selectProvider(.qwen)
+        XCTAssertEqual(settings.model, "qwen3.8-flash")
+        XCTAssertEqual(settings.extra["enable_thinking"] as? Bool, false)
+        settings.selectProvider(.nvidia)  // no recommended model: pick one first
+        XCTAssertEqual(settings.model, "")
+        XCTAssertEqual(settings.extraBody, "{}")
+        settings.chooseModel("nvidia/nemotron-3.5-super-vl-120b-a12b")
+        XCTAssertNotNil(settings.extra["chat_template_kwargs"])
+        settings.extraBody = #"{"mine": 1}"#
+        settings.chooseModel("some/listed-model")  // not tested: keeps the user's parameters
+        XCTAssertEqual(settings.model, "some/listed-model")
+        XCTAssertEqual(settings.extra["mine"] as? Int, 1)
     }
 
     func testModelCallStatsCarryNoContent() {

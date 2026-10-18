@@ -4,6 +4,6 @@ The attached video shows the full flow on a real device: 1) connect the board an
 
 Without a board: turn on Settings › Demo data, then quit and reopen the app. It fakes a board, a finished run and the whole setup, so every screen can be reviewed.
 
-The AI model is chosen by the user (OpenAI, Gemini, Qwen, DeepSeek, OpenRouter or any OpenAI-compatible vision endpoint, with the user's own key). Screens, tasks and model replies are never sent to the developer; the only data the developer receives is opt-in anonymous usage stats (off by default, Settings › Privacy).
+The AI model is chosen by the user (OpenAI, Gemini, Qwen, DeepSeek, OpenRouter, NVIDIA, Nebius, H Company, Zhipu GLM or any OpenAI-compatible vision endpoint, with the user's own key). Screens, tasks and model replies are never sent to the developer; the only data the developer receives is opt-in anonymous usage stats (off by default, Settings › Privacy).
 
 Source code: https://github.com/onehumanbeing/esp32-iphone-agent

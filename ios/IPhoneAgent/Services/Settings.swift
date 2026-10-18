@@ -138,7 +138,18 @@ import UIKit
         actorModel = ""
         tokenParam = "auto"
         extraBody = "{}"
+        if let pick = TestedModels.list(for: choice).first(where: \.recommended) { choose(pick) }
         modelsChanged()
+    }
+
+    /// The shared model; a tested one also brings the request parameters it was measured with.
+    func chooseModel(_ id: String) {
+        if let tested = TestedModels.find(id, for: provider) { choose(tested) } else { model = id }
+    }
+
+    private func choose(_ tested: TestedModel) {
+        model = tested.id
+        extraBody = tested.extraBody
     }
 
     #if DEBUG
