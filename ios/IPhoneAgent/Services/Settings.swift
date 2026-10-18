@@ -127,8 +127,13 @@ import UIKit
         guard choice != provider else { return }
         // Keep credentials scoped to an endpoint when switching providers.
         if !apiKey.isEmpty { Keychain.set(apiKey, for: "llm-endpoint-" + baseURL) }
+        defaults.set(currentProfile, forKey: Self.profileKey(provider))
         provider = choice
         defaults.set(choice.rawValue, forKey: "modelProvider")
+        if let saved = defaults.dictionary(forKey: Self.profileKey(choice)) as? [String: String] {
+            restore(saved)
+            return
+        }
         if choice == .others { configurationRevision += 1; return }
         let changedEndpoint = baseURL != choice.baseURL
         baseURL = choice.baseURL
@@ -140,6 +145,36 @@ import UIKit
         extraBody = "{}"
         if let pick = TestedModels.list(for: choice).first(where: \.recommended) { choose(pick) }
         modelsChanged()
+    }
+
+    // Each provider keeps its own settings, so switching back finds them unchanged. Keys stay per endpoint.
+    private static func profileKey(_ p: ModelProvider) -> String { "modelProfile." + p.rawValue }
+
+    private var currentProfile: [String: String] {
+        ["baseURL": baseURL, "model": model, "plannerModel": plannerModel, "actorModel": actorModel,
+         "tokenParam": tokenParam, "extraBody": extraBody]
+    }
+
+    private func restore(_ p: [String: String]) {
+        let url = p["baseURL"] ?? baseURL
+        let changedEndpoint = url != baseURL
+        baseURL = url
+        if changedEndpoint { apiKey = Keychain.get("llm-endpoint-" + url) ?? "" }
+        model = p["model"] ?? ""
+        plannerModel = p["plannerModel"] ?? ""
+        actorModel = p["actorModel"] ?? ""
+        tokenParam = p["tokenParam"] ?? "auto"
+        extraBody = p["extraBody"] ?? "{}"
+        modelsChanged()
+    }
+
+    /// The provider has a usable setup: an endpoint, and a key unless it's a custom (possibly local) server.
+    func isConfigured(_ p: ModelProvider) -> Bool {
+        if p == provider { return isConfigured && (p == .others || !apiKey.isEmpty) }
+        let saved = defaults.dictionary(forKey: Self.profileKey(p)) as? [String: String]
+        let url = saved?["baseURL"] ?? p.baseURL
+        guard let host = URL(string: url)?.host, !host.isEmpty else { return false }
+        return p == .others ? saved != nil : Keychain.get("llm-endpoint-" + url)?.isEmpty == false
     }
 
     /// The shared model; a tested one also brings the request parameters it was measured with.

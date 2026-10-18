@@ -123,6 +123,42 @@ final class StubProtocol: URLProtocol {
         XCTAssertFalse(settings.isConfigured)
     }
 
+    func testEachProviderKeepsItsConfigurationAndKey() {
+        let name = "profile-test-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        let custom = "http://10.0.0.\(Int.random(in: 2...250)):8080/v1"
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            Keychain.set("", for: "llm-endpoint-" + ModelProvider.gemini.baseURL)
+            Keychain.set("", for: "llm-endpoint-" + custom)
+        }
+        let settings = Settings(defaults: defaults, info: [:])
+        settings.selectProvider(.gemini)
+        settings.apiKey = "gemini-key"
+        settings.chooseModel("my-gemini")
+        settings.plannerModel = "gemini-planner"
+        settings.selectProvider(.others)
+        settings.baseURL = custom
+        settings.model = "local-model"
+        settings.extraBody = #"{"local": true}"#
+        XCTAssertTrue(settings.isConfigured(.gemini))
+        XCTAssertFalse(settings.isConfigured(.deepSeek))
+        settings.selectProvider(.gemini)
+        XCTAssertEqual(settings.model, "my-gemini")
+        XCTAssertEqual(settings.plannerModel, "gemini-planner")
+        XCTAssertEqual(settings.apiKey, "gemini-key")
+        XCTAssertTrue(settings.isConfigured(.others))
+        settings.selectProvider(.others)
+        XCTAssertEqual(settings.baseURL, custom)
+        XCTAssertEqual(settings.model, "local-model")
+        XCTAssertEqual(settings.extra["local"] as? Bool, true)
+        // Persisted: a fresh Settings (next launch) restores the same way.
+        let reopened = Settings(defaults: defaults, info: [:])
+        reopened.selectProvider(.gemini)
+        XCTAssertEqual(reopened.model, "my-gemini")
+        XCTAssertEqual(reopened.apiKey, "gemini-key")
+    }
+
     #if DEBUG
     func testLaunchModelConfigurationParsesExplicitParametersOnly() throws {
         XCTAssertNil(try ModelLaunchConfiguration.parse(["app", "-test-model"], environment: ["IA_LLM_API_KEY": "unused"]))

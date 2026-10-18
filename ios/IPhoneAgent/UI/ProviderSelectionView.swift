@@ -59,7 +59,9 @@ struct ProviderSelectionView: View {
                         .lineLimit(1).truncationMode(.middle)
                 }
                 Spacer()
-                if provider.recommended { RecommendedBadge().fixedSize() }
+                if settings.isConfigured(provider) {
+                    Text("Configured").font(.footnote).foregroundStyle(.secondary).fixedSize()
+                } else if provider.recommended { RecommendedBadge().fixedSize() }
                 if settings.provider == provider {
                     Image(systemName: "checkmark").accessibilityLabel("Selected")
                 }
