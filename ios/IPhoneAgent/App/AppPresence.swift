@@ -136,8 +136,8 @@ extension AppModel {
             if now() - logged >= 1 {  // why there is no usable frame yet, once a second
                 logged = now()
                 let threshold = boundary.threshold(backgroundEnteredAt: backgroundEnteredAt)
-                DebugLog.write(String(format: "startup wait %.1f s: frame %@, captured %+.1f s vs boundary, broken %@, mirroring %@, stream %@, board %@",
-                                      now() - began, feed.frame == nil ? "none" : "yes", feed.capturedAt - threshold,
+                DebugLog.write(String(format: "startup wait %.1f s: frame %@, captured %+.1f s vs boundary, last arrived %.1f s ago, broken %@, mirroring %@, stream %@, board %@",
+                                      now() - began, feed.frame == nil ? "none" : "yes", feed.capturedAt - threshold, now() - feed.updated,
                                       "\(feed.broken)", "\(feed.mirroring)", "\(feed.streamOn)", "\(board.connected)"))
             }
             guard now() < startupDeadline else { throw DeviceError(message: Recovery.reason(.frames)) }
@@ -186,6 +186,13 @@ extension AppModel {
                     }
                 }
                 try Task.checkCancellation()
+                // Frames still arriving means the stream is behind (an in-app animation queued over BLE), not
+                // stuck: a snap would resend the whole GOP on the same link and only add to it (17:48 log: the
+                // 32 s snap ended in a BLE drop).
+                if !snapMode, !feed.broken, feed.streamOn, now() - feed.updated < 2 {
+                    try await Task.sleep(nanoseconds: 300_000_000)
+                    continue
+                }
                 let remaining = max(0.1, startupDeadline - now())
                 try await feed.snap(timeout: min(feed.snapTimeout, remaining))
                 receivedSnapshot = true

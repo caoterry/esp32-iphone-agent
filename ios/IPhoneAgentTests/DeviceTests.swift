@@ -259,7 +259,7 @@ import XCTest
         XCTAssertEqual(device.sent.last, "release")
         XCTAssertFalse(device.sent.contains("homescreen"))
         XCTAssertFalse(device.sent.contains("key cmd+h"))
-        XCTAssertTrue(device.sent.contains("move 0 -436"))  // bottom edge to 45% height, with no end hold
+        XCTAssertTrue(device.sent.contains("move 0 -676"))  // bottom edge to 15% height, with no end hold
     }
 
 

@@ -309,7 +309,7 @@ import Foundation
     func homeSwipe() async throws {
         defer { pos = nil }  // edge clamping or a cancelled stroke invalidates the tracked position
         try Task.checkCancellation()
-        try await swipe(0.5, 0.995, 0.5, 0.45, hold: false)
+        try await swipe(0.5, 0.995, 0.5, 0.15, hold: false)  // to the middle only (0.45) left the app card half-way (2026-10-19)
     }
 
     func goBack() async throws {

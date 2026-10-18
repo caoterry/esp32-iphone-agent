@@ -5,8 +5,6 @@ struct AIConsentSheet: View {
     let baseURL: String
     var onAgree: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
-    @State private var readToEnd = false
-    @State private var agreed = false
 
     private var host: String { AIConsent.host(baseURL) }
 
@@ -30,9 +28,6 @@ struct AIConsentSheet: View {
                 Section {
                     Text("Screenshots may show anything on your screen. \(host) handles them under its own privacy policy and terms; the ESP32 Agent developer never receives them. You can withdraw this anytime in Settings › Privacy.")
                         .font(.footnote).foregroundStyle(.secondary)
-                    Toggle("I agree to send this data to \(host)", isOn: $agreed)
-                        .disabled(!readToEnd)
-                        .onAppear { readToEnd = true }  // the last row: the list was scrolled to the end
                 }
             }
             .navigationTitle("Send to AI Service?")
@@ -47,11 +42,10 @@ struct AIConsentSheet: View {
                     onAgree()
                     dismiss()
                 } label: {
-                    Text("Agree").font(.headline).frame(maxWidth: .infinity, minHeight: 34)
+                    Text("I Agree to Send This Data").font(.headline).frame(maxWidth: .infinity, minHeight: 34)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(!agreed)
                 .padding(.horizontal).padding(.vertical, Space.s)
                 .background(.bar)
             }

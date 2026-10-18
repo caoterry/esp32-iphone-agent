@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "I Agree to Send This Data" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我同意发送这些数据"
+          }
+        }
+      }
+    },
     "Not allowed to send to %@ yet" : {
       "localizations" : {
         "zh-Hans" : {

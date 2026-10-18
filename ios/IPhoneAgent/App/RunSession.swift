@@ -91,6 +91,13 @@ extension AppModel {
             } else {
                 try await startupBoardCommand { try await feed.stream(true) }  // reconnect before resuming startup
                 mark("stream on")
+                // Leave only with a decoded screen in hand: right after mirroring starts the stream needs a
+                // moment (pre-warm took ~2 s in the 2026-10-19 log); without it the run waits for a snap.
+                let readyBy = now() + 10
+                while (prewarmJob != nil || !feed.live || feed.broken) && now() < readyBy {
+                    try await Task.sleep(nanoseconds: 200_000_000)
+                }
+                mark(feed.live && !feed.broken ? "screen ready" : "no screen after 10 s; going on")
             }
             #if !DEBUG  // local builds leave with suspend (AppPresence.leaveApp), no flick to aim
             try? await pointer.aimHomeBar()  // the flick then starts with "See you later!"
