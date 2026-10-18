@@ -11,6 +11,9 @@ import UIKit
 
     @Published private(set) var provider: ModelProvider = .others
     @Published private(set) var configurationRevision = 0
+    /// Saved custom endpoints (provider Others) and the one in use.
+    @Published private(set) var customEndpoints: [CustomEndpoint] = []
+    @Published private(set) var activeCustomID: String? { didSet { defaults.set(activeCustomID, forKey: "customEndpointID") } }
     private let defaults: UserDefaults
     @Published var baseURL: String { didSet {
         defaults.set(baseURL, forKey: "baseURL")
@@ -69,6 +72,8 @@ import UIKit
         acceptedDisclaimer = defaults.bool(forKey: "acceptedDisclaimer")
         provider = defaults.string(forKey: "modelProvider").flatMap(ModelProvider.init(rawValue:))
             ?? ModelProvider.infer(baseURL: baseURL, model: model)
+        customEndpoints = Self.loadCustom(defaults)
+        activeCustomID = defaults.string(forKey: "customEndpointID")
         DebugLog.redact([apiKey])  // never in debug.log
     }
 
@@ -125,16 +130,14 @@ import UIKit
 
     func selectProvider(_ choice: ModelProvider) {
         guard choice != provider else { return }
-        // Keep credentials scoped to an endpoint when switching providers.
-        if !apiKey.isEmpty { Keychain.set(apiKey, for: "llm-endpoint-" + baseURL) }
-        defaults.set(currentProfile, forKey: Self.profileKey(provider))
+        if choice == .others { return selectCustom(activeCustomID ?? customEndpoints.first?.id) }
+        saveCurrent()
         provider = choice
         defaults.set(choice.rawValue, forKey: "modelProvider")
         if let saved = defaults.dictionary(forKey: Self.profileKey(choice)) as? [String: String] {
             restore(saved)
             return
         }
-        if choice == .others { configurationRevision += 1; return }
         let changedEndpoint = baseURL != choice.baseURL
         baseURL = choice.baseURL
         if changedEndpoint { apiKey = Keychain.get("llm-endpoint-" + baseURL) ?? "" }
@@ -147,7 +150,24 @@ import UIKit
         modelsChanged()
     }
 
-    // Each provider keeps its own settings, so switching back finds them unchanged. Keys stay per endpoint.
+    /// Switch to a saved custom endpoint, or start a new blank one (nil).
+    func selectCustom(_ id: String?) {
+        if provider == .others, id != nil, id == activeCustomID { return }
+        saveCurrent()
+        provider = .others
+        defaults.set(ModelProvider.others.rawValue, forKey: "modelProvider")
+        activeCustomID = id
+        restore(customEndpoints.first { $0.id == id }?.fields ?? ["baseURL": "", "model": ""])
+    }
+
+    func deleteCustom(_ id: String) {
+        guard !(provider == .others && id == activeCustomID) else { return }  // not the one in use
+        customEndpoints.removeAll { $0.id == id }
+        storeCustom()
+    }
+
+    // Each provider keeps its own settings, so switching back finds them unchanged; custom endpoints are
+    // kept as a list. Keys stay per endpoint in the Keychain.
     private static func profileKey(_ p: ModelProvider) -> String { "modelProfile." + p.rawValue }
 
     private var currentProfile: [String: String] {
@@ -155,11 +175,39 @@ import UIKit
          "tokenParam": tokenParam, "extraBody": extraBody]
     }
 
+    /// Remember the live configuration under its provider (or custom endpoint) and its key under its endpoint.
+    func saveCurrent() {
+        if !apiKey.isEmpty { Keychain.set(apiKey, for: "llm-endpoint-" + baseURL) }
+        guard provider == .others else { return defaults.set(currentProfile, forKey: Self.profileKey(provider)) }
+        guard isConfigured else { return }  // a blank new endpoint isn't kept
+        let id = activeCustomID
+            ?? customEndpoints.first { $0.baseURL == baseURL && $0.model == model }?.id ?? UUID().uuidString
+        let entry = CustomEndpoint(id: id, fields: currentProfile)
+        if let i = customEndpoints.firstIndex(where: { $0.id == id }) { customEndpoints[i] = entry } else { customEndpoints.append(entry) }
+        activeCustomID = id
+        storeCustom()
+    }
+
+    private func storeCustom() {
+        defaults.set(customEndpoints.map { $0.fields.merging(["id": $0.id]) { $1 } }, forKey: "customEndpoints")
+    }
+
+    private static func loadCustom(_ defaults: UserDefaults) -> [CustomEndpoint] {
+        var list = (defaults.array(forKey: "customEndpoints") as? [[String: String]] ?? []).compactMap { d in
+            d["id"].map { CustomEndpoint(id: $0, fields: d.filter { $0.key != "id" }) }
+        }
+        // Builds before the list kept a single custom profile.
+        if list.isEmpty, let legacy = defaults.dictionary(forKey: profileKey(.others)) as? [String: String] {
+            list = [CustomEndpoint(id: UUID().uuidString, fields: legacy)]
+        }
+        return list
+    }
+
     private func restore(_ p: [String: String]) {
         let url = p["baseURL"] ?? baseURL
         let changedEndpoint = url != baseURL
         baseURL = url
-        if changedEndpoint { apiKey = Keychain.get("llm-endpoint-" + url) ?? "" }
+        if changedEndpoint { apiKey = url.isEmpty ? "" : Keychain.get("llm-endpoint-" + url) ?? "" }
         model = p["model"] ?? ""
         plannerModel = p["plannerModel"] ?? ""
         actorModel = p["actorModel"] ?? ""
@@ -168,13 +216,13 @@ import UIKit
         modelsChanged()
     }
 
-    /// The provider has a usable setup: an endpoint, and a key unless it's a custom (possibly local) server.
+    /// The provider has a usable setup: an endpoint and a key (a custom server may not need one).
     func isConfigured(_ p: ModelProvider) -> Bool {
-        if p == provider { return isConfigured && (p == .others || !apiKey.isEmpty) }
-        let saved = defaults.dictionary(forKey: Self.profileKey(p)) as? [String: String]
-        let url = saved?["baseURL"] ?? p.baseURL
+        if p == .others { return !customEndpoints.isEmpty || (provider == .others && isConfigured) }
+        if p == provider { return isConfigured && !apiKey.isEmpty }
+        let url = (defaults.dictionary(forKey: Self.profileKey(p)) as? [String: String])?["baseURL"] ?? p.baseURL
         guard let host = URL(string: url)?.host, !host.isEmpty else { return false }
-        return p == .others ? saved != nil : Keychain.get("llm-endpoint-" + url)?.isEmpty == false
+        return Keychain.get("llm-endpoint-" + url)?.isEmpty == false
     }
 
     /// The shared model; a tested one also brings the request parameters it was measured with.
@@ -194,6 +242,7 @@ import UIKit
     func importLaunchConfiguration(arguments: [String], environment: [String: String] = [:]) throws -> Bool {
         guard let config = try ModelLaunchConfiguration.parse(arguments, environment: environment) else { return false }
         selectProvider(.others)
+        activeCustomID = nil  // a new custom endpoint, never written over a saved one
         defaults.set(ModelProvider.others.rawValue, forKey: "modelProvider")
         apiKey = ""
         baseURL = config.baseURL
@@ -344,5 +393,18 @@ enum Hotspot {
     /// The SSID the phone is on, if it is one of ours (needs the hotspot entitlement).
     static func currentSSID() async -> String? {
         await NEHotspotNetwork.fetchCurrent()?.ssid
+    }
+}
+
+/// A saved custom (Others) endpoint configuration.
+struct CustomEndpoint: Identifiable, Equatable {
+    let id: String
+    let fields: [String: String]
+    var baseURL: String { fields["baseURL"] ?? "" }
+    var model: String { fields["model"] ?? "" }
+    /// Host (and port) of the endpoint, e.g. "192.168.1.4:8080".
+    var title: String {
+        guard let url = URL(string: baseURL), let host = url.host else { return baseURL }
+        return url.port.map { "\(host):\($0)" } ?? host
     }
 }

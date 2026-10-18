@@ -159,6 +159,40 @@ final class StubProtocol: URLProtocol {
         XCTAssertEqual(reopened.apiKey, "gemini-key")
     }
 
+    func testSeveralCustomEndpointsAreKept() {
+        let name = "custom-test-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = Settings(defaults: defaults, info: [:])
+        settings.selectCustom(nil)
+        settings.baseURL = "http://10.0.0.5:8080/v1"
+        settings.model = "first"
+        settings.selectCustom(nil)  // add another
+        XCTAssertEqual(settings.baseURL, "")
+        settings.baseURL = "https://example.com/v1"
+        settings.model = "second"
+        settings.selectProvider(.qwen)
+        XCTAssertEqual(settings.customEndpoints.map(\.model), ["first", "second"])
+        XCTAssertEqual(settings.customEndpoints.first?.title, "10.0.0.5:8080")
+        settings.selectCustom(settings.customEndpoints[0].id)
+        XCTAssertEqual(settings.baseURL, "http://10.0.0.5:8080/v1")
+        XCTAssertEqual(settings.model, "first")
+        settings.deleteCustom(settings.customEndpoints[0].id)  // in use: kept
+        XCTAssertEqual(settings.customEndpoints.count, 2)
+        settings.deleteCustom(settings.customEndpoints[1].id)
+        XCTAssertEqual(Settings(defaults: defaults, info: [:]).customEndpoints.map(\.model), ["first"])
+    }
+
+    func testLegacySingleCustomProfileMigrates() {
+        let name = "legacy-custom-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(["baseURL": "http://10.0.0.9/v1", "model": "m"], forKey: "modelProfile.others")
+        let settings = Settings(defaults: defaults, info: [:])
+        XCTAssertEqual(settings.customEndpoints.map(\.baseURL), ["http://10.0.0.9/v1"])
+        XCTAssertTrue(settings.isConfigured(.others))
+    }
+
     #if DEBUG
     func testLaunchModelConfigurationParsesExplicitParametersOnly() throws {
         XCTAssertNil(try ModelLaunchConfiguration.parse(["app", "-test-model"], environment: ["IA_LLM_API_KEY": "unused"]))
