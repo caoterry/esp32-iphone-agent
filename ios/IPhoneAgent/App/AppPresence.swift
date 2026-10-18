@@ -123,7 +123,7 @@ extension AppModel {
     func waitForStartupFrame(boundary: StartupFrameBoundary, snapMode: Bool) async throws -> String {
         let began = now()
         var recovery = Recovery(at: began, limit: max(0, startupDeadline - began))
-        let streamDeadline = snapMode ? began : began + 3
+        var streamDeadline = snapMode ? began : began + 3
         var requestedMotion = false
         var receivedSnapshot = false
         var source = "live"
@@ -131,7 +131,15 @@ extension AppModel {
             feed.frame != nil && !feed.broken
                 && boundary.accepts(capturedAt: feed.capturedAt, backgroundEnteredAt: backgroundEnteredAt)
         }
+        var logged = 0.0
         while true {
+            if now() - logged >= 1 {  // why there is no usable frame yet, once a second
+                logged = now()
+                let threshold = boundary.threshold(backgroundEnteredAt: backgroundEnteredAt)
+                DebugLog.write(String(format: "startup wait %.1f s: frame %@, captured %+.1f s vs boundary, broken %@, mirroring %@, stream %@, board %@",
+                                      now() - began, feed.frame == nil ? "none" : "yes", feed.capturedAt - threshold,
+                                      "\(feed.broken)", "\(feed.mirroring)", "\(feed.streamOn)", "\(board.connected)"))
+            }
             guard now() < startupDeadline else { throw DeviceError(message: Recovery.reason(.frames)) }
             try Task.checkCancellation()
             guard appIsBackgrounded else {
@@ -170,6 +178,12 @@ extension AppModel {
                     }
                     try await pointer.point(0.55, 0.5, aim: false)
                     requestedMotion = true
+                    // The cursor change is streamed within a second; snapping the whole GOP over BLE
+                    // (12-60 s) is only the fallback when that frame doesn't come.
+                    if !snapMode {
+                        streamDeadline = now() + 3
+                        continue
+                    }
                 }
                 try Task.checkCancellation()
                 let remaining = max(0.1, startupDeadline - now())

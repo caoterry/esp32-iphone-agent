@@ -39,15 +39,21 @@ struct AIConsentSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Not Now") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Agree") {
-                        AIConsent.grant(baseURL)
-                        Analytics.capture("ai_consent", ["granted": true])
-                        onAgree()
-                        dismiss()
-                    }
-                    .disabled(!agreed)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    AIConsent.grant(baseURL)
+                    Analytics.capture("ai_consent", ["granted": true])
+                    onAgree()
+                    dismiss()
+                } label: {
+                    Text("Agree").font(.headline).frame(maxWidth: .infinity, minHeight: 34)
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!agreed)
+                .padding(.horizontal).padding(.vertical, Space.s)
+                .background(.bar)
             }
         }
         .interactiveDismissDisabled()
@@ -62,16 +68,28 @@ struct AIConsentRow: View {
     var body: some View {
         if AIConsent.store && settings.isConfigured {
             let host = AIConsent.host(settings.baseURL)
-            Button { asking = true } label: {
-                Label {
-                    Text(AIConsent.granted(settings.baseURL) ? "Allowed to send to \(host)" : "Allow sending to \(host)…")
-                } icon: {
-                    Image(systemName: AIConsent.granted(settings.baseURL) ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
-                        .foregroundStyle(AIConsent.granted(settings.baseURL) ? Palette.ok : .orange)
+            Group {
+                if AIConsent.granted(settings.baseURL) {
+                    Label { Text("Allowed to send to \(host)") } icon: {
+                        Image(systemName: "checkmark.shield.fill").foregroundStyle(Palette.ok)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                } else {
+                    // Nothing works until this is allowed: an unmistakable blocker with a solid button.
+                    VStack(alignment: .leading, spacing: Space.s) {
+                        Label { Text("Not allowed to send to \(host) yet") } icon: {
+                            Image(systemName: "exclamationmark.shield.fill")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.red)
+                        Button { asking = true } label: {
+                            Text("Review and Allow").font(.headline).frame(maxWidth: .infinity, minHeight: 30)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(.vertical, Space.s)
                 }
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
-            .disabled(AIConsent.granted(settings.baseURL))
             .sheet(isPresented: $asking) {
                 AIConsentSheet(baseURL: settings.baseURL) { settings.consentChanged() }
             }

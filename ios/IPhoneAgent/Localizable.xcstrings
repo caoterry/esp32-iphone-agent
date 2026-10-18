@@ -1,6 +1,26 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Not allowed to send to %@ yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未允许发送到 %@"
+          }
+        }
+      }
+    },
+    "Review and Allow" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看并允许"
+          }
+        }
+      }
+    },
     "In Use" : {
       "localizations" : {
         "zh-Hans" : {

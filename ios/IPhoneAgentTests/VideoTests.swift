@@ -95,6 +95,18 @@ final class VideoTests: XCTestCase {
         XCTAssertFalse(feed.broken)
     }
 
+    func testSnapWaitsForTheDecoderToWorkThroughTheGOP() async throws {
+        let decoder = H264Decoder(), feed = VideoFeed(decoder: decoder)
+        let device = FrameDevice()
+        feed.device = device
+        device.onSend = { _ in
+            decoder.queue.async { Thread.sleep(forTimeInterval: 0.3) }  // a long GOP still decoding after the ack
+            decoder.queue.async { DispatchQueue.main.async { feed.show(Data([3]), width: 10, height: 20) } }
+        }
+        _ = try await feed.snap(decodeWait: 0.05)
+        XCTAssertEqual(feed.frame, Data([3]))
+    }
+
     func testLateDecodedImageFromDisconnectedLinkCannotReplaceTheScreen() async throws {
         let decoder = H264Decoder(), feed = VideoFeed(decoder: decoder)
         feed.show(Data([1]), width: 10, height: 20)

@@ -62,6 +62,7 @@ extension ScreenSource {
     private(set) var capturedAt = 0.0
     /// A decode error or a lost chunk since the last good frame: the shown frame is stale until the next IDR.
     private(set) var broken = false
+    private var noteLogged = 0.0
     private var clockOffset: Double?  // local s − board s, the smallest seen (≈ the link latency)
     var mirroring = false  // board status says ap == streaming
     var metrics: Metrics?
@@ -78,7 +79,12 @@ extension ScreenSource {
         decoder.onError = { [weak self] msg in
             DispatchQueue.main.async {
                 let bg = UIApplication.shared.applicationState == .background
-                self?.note = bg ? "\(msg) [in background]" : msg
+                let note = bg ? "\(msg) [in background]" : msg
+                if note != self?.note || now() - (self?.noteLogged ?? 0) > 5 {  // was only in Diagnostics
+                    DebugLog.write("decoder: " + note)
+                    self?.noteLogged = now()
+                }
+                self?.note = note
                 self?.metrics?.decodeError(background: bg)
                 self?.broken = true
             }
@@ -171,19 +177,26 @@ extension ScreenSource {
             try await device.send("snap")
         }
         try Task.checkCancellation()
+        // A snap delivers the whole GOP at once; decoding it can take seconds (≈45 fps in the 2026-10-17 log),
+        // so `decodeWait` only starts once the decoder has caught up with it.
         let drain = DecodeDrain()
-        let deadline = now() + max(0, decodeWait)
+        let drainLimit = now() + max(decodeWait, 15)
+        let acked = now()
+        var caughtUp: Double?
         decoder.queue.async { DispatchQueue.main.async { drain.completed = true } }
         while !drain.completed || frame == nil || updated <= previousFrame || broken {
             try Task.checkCancellation()
-            guard now() < deadline else {
+            if drain.completed, caughtUp == nil { caughtUp = now() }
+            guard now() < caughtUp.map({ $0 + max(0, decodeWait) }) ?? drainLimit else {
                 broken = true
+                DebugLog.write("snap: no new image (decoder \(drain.completed ? "caught up" : "still busy"), frame \(frame == nil ? "none" : String(format: "%.1f s old", now() - updated)))")
                 throw DeviceError(message: String(localized: "The board answered, but no new screen image arrived. Keep Screen Mirroring connected and try again."))
             }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         try Task.checkCancellation()
         let ms = (now() - started) * 1000
+        DebugLog.write(String(format: "snap: ack after %.0f ms, decoded +%.0f ms", (acked - started) * 1000, (now() - acked) * 1000))
         metrics?.snapLatency(ms)
         return ms
     }
