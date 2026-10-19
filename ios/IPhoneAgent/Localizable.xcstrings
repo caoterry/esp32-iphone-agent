@@ -2478,6 +2478,16 @@
         }
       }
     },
+    "Turn off Personal Hotspot first: while it shares this iPhone's internet, the iPhone can't join the board's Wi-Fi." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先关闭个人热点：iPhone 在共享网络时无法连接板子的 Wi-Fi。"
+          }
+        }
+      }
+    },
     "Internet uses cellular data while on the board's Wi-Fi." : {
       "localizations" : {
         "zh-Hans" : {
@@ -5115,6 +5125,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "agent 应该做什么？"
+          }
+        }
+      }
+    },
+    "Turn off Personal Hotspot before joining. While joined, the internet goes over cellular data. Switch back in Settings › Wi-Fi when you are done." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接前请先关闭个人热点。加入后，上网会走蜂窝数据。用完后在 设置 › 无线局域网 里切回。"
           }
         }
       }

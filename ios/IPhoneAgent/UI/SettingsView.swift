@@ -144,7 +144,7 @@ struct BoardSettingsView: View {
             } header: {
                 Text("Wi-Fi")
             } footer: {
-                Text("While joined, the internet goes over cellular data. Switch back in Settings › Wi-Fi when you are done.")
+                Text("Turn off Personal Hotspot before joining. While joined, the internet goes over cellular data. Switch back in Settings › Wi-Fi when you are done.")
             }
             if board.pairedID != nil {
                 Section {

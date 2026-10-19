@@ -134,8 +134,12 @@ struct SeePage: View {
             }
             if !joined {
                 if let net = app.manualHotspot, let ssid = net.ssid, failure != nil { manual(ssid: ssid, pass: net.pass) }
-                Label("Internet uses cellular data while on the board's Wi-Fi.", systemImage: "antenna.radiowaves.left.and.right")
-                    .font(.footnote).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: Space.s) {
+                    Label("Turn off Personal Hotspot first: while it shares this iPhone's internet, the iPhone can't join the board's Wi-Fi.",
+                          systemImage: "personalhotspot")
+                    Label("Internet uses cellular data while on the board's Wi-Fi.", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .font(.footnote).foregroundStyle(.secondary)
                 Button("I'm already on the board's Wi-Fi") { onWiFi = true }.font(.footnote)
             } else if !streaming {
                 Text("Now swipe down from the top-right corner and tap **Screen Mirroring → ESP32 Agent**.")
