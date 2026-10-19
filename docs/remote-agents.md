@@ -37,8 +37,14 @@ Configure an MCP client to launch this command (stdio transport):
 
 Start with `iphone_status` and `iphone_screenshot`. Coordinates are image fractions
 from 0 to 1. The bridge exposes tap, swipe, scroll, type, key, Home, Back and
-calibration. Direct controls need no model credentials. Keyboard input is
-printable ASCII on one line; use `iphone_key` for Enter or editing combinations.
+calibration. Direct controls need no model credentials. Keyboard input is one
+printable line: the board types ASCII, and other text such as Chinese is pasted
+through Universal Clipboard (server on a Mac with the phone's Apple Account and
+Handoff on). A paste takes about 5 s and may first show iOS's "Allow Paste"
+prompt; to skip it, set Settings > the app > Paste from Other Apps to Allow. The
+pasted text stays on the Mac's clipboard. If the phone's keyboard is a Chinese
+input method, typed ASCII goes through it; switch to an English keyboard first.
+Use `iphone_key` for Enter or editing combinations.
 Only type into a visibly focused field. Observe after each action: an `ok` reply
 is a command acknowledgement, and the latest AirPlay frame can precede its effect.
 Home/Back use the existing gestures and need visual confirmation.

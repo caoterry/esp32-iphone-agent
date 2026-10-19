@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import unicodedata
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -76,9 +77,10 @@ class KeyboardText(Text):
     text: str = Field(min_length=1, max_length=4000)
 
 
-def check_keyboard(text):
-    if not text.isascii() or any(ord(c) < 32 or ord(c) == 127 for c in text):
-        raise HTTPException(422, "keyboard input must be printable ASCII on one line")
+def check_keyboard(text, ascii_only=False):
+    """One line, no control characters. Non-ASCII text is fine for typing (it is pasted), never for keys."""
+    if (ascii_only and not text.isascii()) or any(unicodedata.category(c) in ("Cc", "Zl", "Zp") for c in text):
+        raise HTTPException(422, "keys must be printable ASCII" if ascii_only else "text must be one printable line")
 
 
 manual_lock = asyncio.Lock()
@@ -149,7 +151,7 @@ async def type_text(t: KeyboardText):
 
 @app.post("/api/key")
 async def key(t: KeyboardText):
-    check_keyboard(t.text)
+    check_keyboard(t.text, ascii_only=True)
     return await act(lambda: phone.key(t.text))
 
 

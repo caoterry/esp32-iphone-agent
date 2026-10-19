@@ -228,7 +228,8 @@ These are directions, not promises. If you're interested, or you've tried someth
 
 - iOS does not mirror some screens (passcode entry, Apple Pay, DRM video); the agent cannot see them.
 - Mirroring stops when the phone locks; keep auto-lock off while the agent works.
-- Keyboard input is ASCII only.
+- The board types ASCII only. Other text (e.g. Chinese) is pasted through Universal Clipboard, so it needs the
+  server on a Mac signed in to the phone's Apple Account, with Handoff on.
 - Re-calibrate after changing AssistiveTouch tracking speed.
 - Landscape apps are not supported yet: drawings and taps there land in the wrong place.
 - On Linux machines with several network interfaces, limit Avahi (mDNS) to the interface on the phone's network

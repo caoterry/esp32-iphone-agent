@@ -134,7 +134,8 @@ def test_direct_action_and_agent_start_cannot_interleave(api, monkeypatch):
     ("/api/scroll", {"x": .5, "y": .5, "lines": 101}),
     ("/api/type", {"text": "Calendar\nhome"}),
     ("/api/key", {"text": "enter\rhome"}),
-    ("/api/type", {"text": "你好"}),
+    ("/api/type", {"text": "你好\u2028世界"}),
+    ("/api/key", {"text": "cmd+你"}),
     ("/api/type", {"text": "\u007f"}),
     ("/api/calibrate/finish", {"x": 0, "y": .5}),
 ])
@@ -147,3 +148,14 @@ def test_invalid_remote_input_is_rejected_before_hid(api, path, body):
         assert not calls
 
     asyncio.run(scenario())
+
+
+def test_non_ascii_text_reaches_the_phone(api):
+    module, calls = api
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=module.app), base_url="http://legacy") as client:
+            assert (await client.post("/api/type", json={"text": "打开设置 ⚙️"})).status_code == 200
+
+    asyncio.run(scenario())
+    assert calls == [("type", "打开设置 ⚙️")]

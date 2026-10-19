@@ -13,7 +13,7 @@ import time
 from collections import deque
 from pathlib import Path
 
-from . import vision
+from . import clipboard, vision
 from .device import Device
 
 log = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ TAP_GAP = 0.15          # seconds to stay still after a click, so iOS sees a fin
 NUDGE = 12              # mouse units the pointer is wiggled by to find it on screen
 AIM_TOLERANCE = 0.008   # screen fraction; a bigger miss is corrected before pressing
 MAX_MISS = 0.06         # bigger misses are still corrected, but not learned from (they may be misreadings)
+HANDOFF_WAIT = 4.0      # seconds for Universal Clipboard to offer the Mac's new clipboard (1 s was too short)
 
 
 class Phone:
@@ -203,7 +204,17 @@ class Phone:
         await self.device.send(f"scroll {lines} 0")
 
     async def type(self, text: str) -> None:
-        await self.device.send(f"type {text}")
+        """ASCII is typed key by key; anything else (Chinese, emoji) is pasted through Universal Clipboard."""
+        if text.isascii():
+            await self.device.send(f"type {text}")
+            return
+        if not clipboard.supported():
+            raise RuntimeError("non-ASCII text is pasted through Universal Clipboard, so the server must run on a Mac")
+        # The text stays on the Mac's clipboard: iOS may first ask "Allow Paste?", and putting the user's own
+        # clipboard back before that is answered would paste it (it could be a password) instead.
+        clipboard.write(text)
+        await asyncio.sleep(HANDOFF_WAIT)
+        await self.device.send("key cmd+v")
 
     async def key(self, combo: str) -> None:
         await self.device.send(f"key {combo}")

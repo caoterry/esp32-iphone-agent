@@ -49,7 +49,12 @@ def create_server(url: str | None = None):
 
     @mcp.tool()
     def iphone_type(text: str) -> dict:
-        """Type printable ASCII into a visibly focused field, without submitting."""
+        """Type one line into a visibly focused field, without submitting.
+
+        Non-ASCII text (e.g. Chinese) is pasted through Universal Clipboard (the server's Mac and the
+        iPhone need the same Apple Account with Handoff on) and takes about 5 s. iOS may then ask
+        "Allow Paste": take a screenshot and tap Allow Paste. If the phone's keyboard is a Chinese
+        input method, typed ASCII goes through it: switch to an English keyboard first."""
         with IPhoneClient(url) as client:
             return client.action("type", text=text)
 
