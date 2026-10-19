@@ -23,6 +23,8 @@ def parser() -> argparse.ArgumentParser:
         action = sub.add_parser(name, help="coordinates are screen fractions from 0 to 1")
         for key in keys:
             action.add_argument(key, type=int if key == "lines" else float)
+    sub.choices["tap"].add_argument("--precise", action="store_true",
+                                    help="find the pointer and correct a miss before tapping (about 1 s slower)")
     for name in ("type", "key"):
         sub.add_parser(name).add_argument("text")
     calibration = sub.add_parser("calibrate")
@@ -44,7 +46,7 @@ def main(argv=None) -> int:
                 case "screenshot":
                     args.output.write_bytes(client.screenshot())
                     result = {"path": str(args.output.resolve())}
-                case "tap": result = client.action("tap", x=args.x, y=args.y)
+                case "tap": result = client.action("tap", x=args.x, y=args.y, precise=args.precise)
                 case "swipe": result = client.action("swipe", x1=args.x1, y1=args.y1, x2=args.x2, y2=args.y2)
                 case "scroll": result = client.action("scroll", x=args.x, y=args.y, lines=args.lines)
                 case "type" | "key": result = client.action(args.command, text=args.text)

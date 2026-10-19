@@ -19,7 +19,7 @@ def api(tmp_path, monkeypatch):
     class Phone:
         span = {"w": 400, "h": 800}
         calibrated = True
-        async def tap(self, x, y): calls.append(("tap", x, y))
+        async def tap(self, x, y, aim=False): calls.append(("tap", x, y, "aim") if aim else ("tap", x, y))
         async def type(self, text): calls.append(("type", text))
         async def key(self, text): calls.append(("key", text))
         async def start_calibration(self): return True
@@ -126,6 +126,18 @@ def test_direct_action_and_agent_start_cannot_interleave(api, monkeypatch):
             assert calls == [("tap", .5, .4)]
 
     asyncio.run(scenario())
+
+
+def test_precise_tap_finds_the_pointer_first(api):
+    module, calls = api
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=module.app), base_url="http://legacy") as client:
+            assert (await client.post("/api/tap", json={"x": .5, "y": .4, "precise": True})).status_code == 200
+            assert (await client.post("/api/tap", json={"x": .2, "y": .3})).status_code == 200
+
+    asyncio.run(scenario())
+    assert calls == [("tap", .5, .4, "aim"), ("tap", .2, .3)]
 
 
 @pytest.mark.parametrize("path,body", [

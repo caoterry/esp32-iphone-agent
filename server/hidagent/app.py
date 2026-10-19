@@ -57,6 +57,10 @@ class Point(BaseModel):
     y: float = Field(ge=0, le=1, allow_inf_nan=False)
 
 
+class Tap(Point):
+    precise: bool = False  # find the pointer on screen and correct a miss before tapping (about 1 s slower)
+
+
 class Swipe(BaseModel):
     x1: float = Field(ge=0, le=1, allow_inf_nan=False)
     y1: float = Field(ge=0, le=1, allow_inf_nan=False)
@@ -127,8 +131,8 @@ def step_shot(index: int):
 
 
 @app.post("/api/tap")
-async def tap(p: Point):
-    return await act(lambda: phone.tap(p.x, p.y))
+async def tap(p: Tap):
+    return await act(lambda: phone.tap(p.x, p.y, aim=True) if p.precise else phone.tap(p.x, p.y))
 
 
 @app.post("/api/swipe")

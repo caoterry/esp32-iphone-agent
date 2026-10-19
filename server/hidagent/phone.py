@@ -20,6 +20,10 @@ log = logging.getLogger(__name__)
 
 CALIBRATION_MOVE = 200  # mouse units moved diagonally for a manual (one point) calibration; stays on screen
 CALIBRATION_STOPS = (150, 350)  # automatic calibration finds the pointer at these distances from the corner
+# then where it lands for plain moves across the whole screen: the two stops above sit in the top-left
+# third, so a line through them alone stretches small reading errors into misses of up to ~65 px near the
+# bottom; with this grid the worst miss stayed within ~18 px (three calibrations on a real iPhone)
+CALIBRATION_GRID = tuple((x, y) for y in (0.15, 0.5, 0.85) for x in (0.15, 0.5, 0.85))
 REHOME_EVERY = 10       # gestures between re-homing
 HOLD = 0.25             # seconds to rest before lifting, so iOS adds no momentum (the swipe stops where it ends)
 TAP_GAP = 0.15          # seconds to stay still after a click, so iOS sees a finished tap, not the start of a drag
@@ -39,7 +43,7 @@ class Phone:
         self._link = 0  # device.links when the pointer was last homed
         # where the pointer really landed (seen on screen) for the screen fraction we aimed at, per axis;
         # a straight-line fit through them corrects every later move, so taps get better as the agent works
-        self._seen = {axis: deque(map(tuple, (saved or {}).get("seen", {}).get(axis, [])), maxlen=12)
+        self._seen = {axis: deque(map(tuple, (saved or {}).get("seen", {}).get(axis, [])), maxlen=24)
                       for axis in ("x", "y")}
 
     @property
@@ -76,6 +80,14 @@ class Phone:
         for units, x, y in seen:  # where each stop landed, so moves are corrected for the offset too
             self._seen["x"].append((units / self.span["w"], x))
             self._seen["y"].append((units / self.span["h"], y))
+        for gx, gy in CALIBRATION_GRID:
+            await self.device.send("home")
+            await self.device.send(f"move {round(gx * self.span['w'])} {round(gy * self.span['h'])}")
+            found = await self._find_pointer()
+            if found and max(abs(found[0] - gx), abs(found[1] - gy)) <= 2 * MAX_MISS:
+                self._seen["x"].append((gx, found[0]))
+                self._seen["y"].append((gy, found[1]))
+        self._pos = None  # the grid moved the pointer behind _move_to's back
         self._save()
         log.info("calibration: pointer at %s, span %s", [(round(x, 3), round(y, 3)) for _, x, y in seen], self.span)
         return True

@@ -30,10 +30,13 @@ def create_server(url: str | None = None):
             return Image(data=client.screenshot(), format="jpeg")
 
     @mcp.tool()
-    def iphone_tap(x: float, y: float) -> dict:
-        """Tap a visible target at image fractions 0–1; observe the screen afterward."""
+    def iphone_tap(x: float, y: float, precise: bool = False) -> dict:
+        """Tap a visible target at image fractions 0–1; observe the screen afterward.
+
+        precise=True finds the pointer on screen and corrects a miss before tapping (about 1 s slower):
+        use it for small or crowded targets, near screen edges, or after a tap missed."""
         with IPhoneClient(url) as client:
-            return client.action("tap", x=x, y=y)
+            return client.action("tap", x=x, y=y, precise=precise)
 
     @mcp.tool()
     def iphone_swipe(x1: float, y1: float, x2: float, y2: float) -> dict:
