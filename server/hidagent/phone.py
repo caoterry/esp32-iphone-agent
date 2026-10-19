@@ -145,11 +145,14 @@ class Phone:
         await self.device.send(f"move -{NUDGE} 0")
         if await self.screen.fresh(sent, PROBE_WAIT):
             return
+        name = getattr(self.screen, "name", "iPhone Agent")
+        if not self.screen.updated:  # no frame ever: nothing is stuck, mirroring was just never started
+            raise PhoneUnavailable(f"the phone is not mirrored: choose Control Center › Screen Mirroring › {name}")
         if time.time() - self.screen.updated > FROZEN_AFTER:
             self.screen.restart()
             raise PhoneUnavailable("the mirrored screen stopped updating, so the AirPlay receiver was restarted: "
                                    "unlock the phone if it is locked, then choose Control Center › Screen Mirroring › "
-                                   f"{getattr(self.screen, 'name', 'iPhone Agent')} again")
+                                   f"{name} again")
         raise PhoneUnavailable("the pointer did not move on the mirrored screen: unlock the phone if it is locked; "
                                "if it is unlocked, it is ignoring the board's mouse, so unplug the board's adapter "
                                "from the phone and plug it back in")

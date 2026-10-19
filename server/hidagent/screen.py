@@ -51,6 +51,9 @@ class Screen:
         """Restart UxPlay (its supervisor starts a new one); the phone must choose it in Screen Mirroring again."""
         log.warning("AirPlay receiver: no new frames, restarting it")
         if self.stream:
+            if self._sock is None:  # the receiver is gone, so its pid may belong to an unrelated process by now
+                log.warning("no AirPlay receiver is streaming at %s: start `python -m hidagent.receiver`", self.stream)
+                return
             try:
                 os.kill(int(Path(self.pidfile).read_text()), signal.SIGTERM)
             except (OSError, TypeError, ValueError) as e:

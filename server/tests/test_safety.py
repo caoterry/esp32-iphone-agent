@@ -85,6 +85,15 @@ def test_a_frozen_mirror_is_restarted_and_nothing_is_clicked(tmp_path):
     assert "click" not in device.lines
 
 
+def test_a_phone_that_was_never_mirrored_is_reported_without_restarting_the_receiver(tmp_path):
+    phone, device, screen = make_phone(tmp_path, age=0, mirroring=False)
+    screen.updated = 0.0  # no frame has ever arrived: Screen Mirroring was not started
+    with pytest.raises(phone_module.PhoneUnavailable, match="Screen Mirroring"):
+        asyncio.run(phone.tap(0.5, 0.5))
+    assert not screen.restarted
+    assert "click" not in device.lines
+
+
 def test_a_mouse_the_phone_ignores_is_reported_and_nothing_is_clicked(tmp_path):
     # a phone locked a moment ago looks the same (board still answers, nothing changes on screen): say both
     phone, device, screen = make_phone(tmp_path, age=10, mouse_works=False)

@@ -58,11 +58,30 @@ def test_the_stream_is_followed_again_after_the_receiver_restarts():
 
 
 def test_restart_stops_the_standalone_receiver_so_its_loop_starts_a_new_one(tmp_path):
+    srv, port = listener()
     fake_uxplay = subprocess.Popen(["sleep", "30"])
     pidfile = tmp_path / "uxplay.pid"
     pidfile.write_text(str(fake_uxplay.pid))
-    Screen(stream="127.0.0.1:9", pidfile=pidfile).restart()
+    screen = Screen(stream=f"127.0.0.1:{port}", pidfile=pidfile)
+    screen.start()
+    conn, _ = srv.accept()
+    assert wait_for(lambda: screen._sock is not None)
+    screen.restart()
     assert wait_for(lambda: fake_uxplay.poll() is not None)
+    screen.stop()
+    conn.close()
+    srv.close()
+
+
+def test_restart_signals_nothing_when_no_receiver_is_streaming(tmp_path):
+    # the receiver is gone, so the pid it recorded may belong to an unrelated process by now
+    other = subprocess.Popen(["sleep", "30"])
+    pidfile = tmp_path / "uxplay.pid"
+    pidfile.write_text(str(other.pid))
+    Screen(stream="127.0.0.1:9", pidfile=pidfile).restart()
+    time.sleep(0.2)
+    assert other.poll() is None
+    other.kill()
 
 
 def test_the_standalone_receiver_streams_jpegs_to_a_local_port():
