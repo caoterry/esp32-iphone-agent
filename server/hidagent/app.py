@@ -23,7 +23,10 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DEBUG = os.environ.get("HIDAGENT_DEBUG") == "1"
 
 device = Device()
-screen = Screen(os.environ.get("AIRPLAY_NAME", "iPhone Agent"))
+# MIRROR_STREAM=127.0.0.1:8891 follows a standalone receiver (python -m hidagent.receiver) instead of running
+# UxPlay here, so restarting the server keeps the phone's Screen Mirroring session
+screen = Screen(os.environ.get("AIRPLAY_NAME", "iPhone Agent"), stream=os.environ.get("MIRROR_STREAM"),
+                pidfile=DATA_DIR / "uxplay.pid")
 phone = Phone(device, DATA_DIR / "calibration.json", screen)
 agent = Agent(phone, screen, LLM.from_env("ACTOR"), LLM.from_env("PLANNER"),
               Trace(DATA_DIR / "traces" if DEBUG else None))

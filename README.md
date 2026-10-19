@@ -107,6 +107,14 @@ cp .env.example .env         # set LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
 set -a && . ./.env && set +a && .venv/bin/python -m hidagent
 ```
 
+To keep the phone's Screen Mirroring session while you restart the server (e.g. after changing code), run the
+AirPlay receiver on its own and let the server follow it:
+
+```bash
+(cd server && set -a && . ./.env && set +a && nohup .venv/bin/python -m hidagent.receiver &)   # once; keeps running
+MIRROR_STREAM=127.0.0.1:8891 .venv/bin/python -m hidagent                                     # restart freely
+```
+
 Open `http://127.0.0.1:8890` in a browser. The server listens on this computer only, because it has no password;
 set `HOST=0.0.0.0` to open it to your network.
 
