@@ -55,8 +55,8 @@ Actions:
   swipe X1 Y1 X2 Y2         (finger moves from X1,Y1 to X2,Y2: "swipe down" means Y2 > Y1)
   path X1 Y1 X2 Y2 X3 Y3 …  (one continuous stroke through 2-20 points, for drawing)
   circle X Y R              (draw a circle centered at X Y; R is the radius in x units)
-  type TEXT                 (tap the input field first; non-ASCII text such as Chinese is pasted, and
-                            if iOS then asks "Allow Paste", tap Allow Paste)
+  type TEXT                 (tap the input field first; non-ASCII text such as Chinese is pasted: if iOS
+                            asks "Allow Paste", tap Allow Paste, and check the field shows your text)
   key COMBO                 (enter, backspace, esc, cmd+a, ...)
   home | back | wait
   replan                    (the plan no longer fits the screen)

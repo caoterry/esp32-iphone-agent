@@ -42,8 +42,11 @@ printable line: the board types ASCII, and other text such as Chinese is pasted
 through Universal Clipboard (server on a Mac with the phone's Apple Account and
 Handoff on). A paste takes about 5 s and may first show iOS's "Allow Paste"
 prompt; to skip it, set Settings > the app > Paste from Other Apps to Allow. The
-pasted text stays on the Mac's clipboard. If the phone's keyboard is a Chinese
-input method, typed ASCII goes through it; switch to an English keyboard first.
+pasted text stays on the Mac's clipboard. If Universal Clipboard did not deliver
+(Handoff off, another Apple Account, too slow), Cmd+V pastes whatever the phone's
+clipboard already held and the command still answers `ok`: check the field in a
+screenshot before submitting anything. If the phone's keyboard is a Chinese input
+method, typed ASCII goes through it; switch to an English keyboard first.
 Use `iphone_key` for Enter or editing combinations.
 Only type into a visibly focused field. Observe after each action: an `ok` reply
 is a command acknowledgement, and the latest AirPlay frame can precede its effect.
