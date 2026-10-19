@@ -29,9 +29,9 @@ HOLD = 0.25             # seconds to rest before lifting, so iOS adds no momentu
 TAP_GAP = 0.15          # seconds to stay still after a click, so iOS sees a finished tap, not the start of a drag
 NUDGE = 12              # mouse units the pointer is wiggled by to find it on screen
 AIM_TOLERANCE = 0.008   # screen fraction; a bigger miss is corrected before pressing
-MAX_MISS = 0.06         # bigger misses are still corrected, but not learned from (they may be misreadings)
+MAX_MISS = 0.06         # bigger misses (up to AIM_REJECT) are still corrected, but not learned from
 HANDOFF_WAIT = 4.0      # seconds for Universal Clipboard to offer the Mac's new clipboard (1 s was too short)
-AIM_REJECT = 2 * MAX_MISS  # a pointer "found" farther than this is something else that moved (a clock hand)
+AIM_REJECT = 2 * MAX_MISS  # a pointer "found" farther off is something else that moved (a clock hand): ignored
 STALE_AFTER = 5.0       # seconds without a new frame before an action first checks that the phone still responds
 PROBE_WAIT = 1.5        # seconds a pointer wiggle gets to show up on the mirrored screen
 FROZEN_AFTER = 70.0     # no frame for this long: not even the status-bar clock changed, so the mirror is stuck
@@ -140,10 +140,13 @@ class Phone:
             return
         if time.time() - self.screen.updated < STALE_AFTER:
             return
+        near_right = self._pos is not None and self._pos[0] > 0.9 * self.span["w"]
+        nudge = -NUDGE if near_right else NUDGE  # iOS stops the pointer at the edge, and the move back would not
         sent = time.time()
-        await self.device.send(f"move {NUDGE} 0")
-        await self.device.send(f"move -{NUDGE} 0")
-        if await self.screen.fresh(sent, PROBE_WAIT):
+        await self.device.send(f"move {nudge} 0")
+        moved = await self.screen.fresh(sent, PROBE_WAIT)  # before moving back: a move undone at once may never show
+        await self.device.send(f"move {-nudge} 0")
+        if moved:
             return
         name = getattr(self.screen, "name", "iPhone Agent")
         if not self.screen.updated:  # no frame ever: nothing is stuck, mirroring was just never started

@@ -179,8 +179,8 @@ async def raw(t: Text):
         raise HTTPException(404)
 
     async def send():
+        phone.forget_position()  # the server will not know where the pointer is, even if the board errs
         await device.send(t.text)
-        phone.forget_position()  # the server no longer knows where the pointer is
     return await act(send)
 
 

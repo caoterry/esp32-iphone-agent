@@ -1,24 +1,48 @@
 """Run the AirPlay receiver on its own: `python -m hidagent.receiver`.
 
-UxPlay streams the phone's screen as JPEG frames to a local TCP port, and the server follows that stream
-(MIRROR_STREAM=127.0.0.1:8891), so restarting the server leaves the phone's Screen Mirroring session alone.
-UxPlay exits on some disconnects; this loop starts it again and records its pid for the server's restart.
+It runs UxPlay (starting it again whenever it exits) and serves the phone's screen as JPEG frames on a local TCP
+port; the server follows that stream (MIRROR_STREAM=127.0.0.1:8891), so restarting the server leaves the phone's
+Screen Mirroring session alone. UxPlay's pid is recorded so the server can still restart a frozen receiver.
 """
 
 import logging
 import os
-import subprocess
+import socket
+import threading
 import time
 from pathlib import Path
 
-from .screen import jpeg_sink
+from .screen import Screen
 
 log = logging.getLogger(__name__)
 
 
-def command(name: str, fps: int, quality: int, port: int) -> list[str]:
-    sink = jpeg_sink(fps, quality, f"tcpserversink host=127.0.0.1 port={port} sync=false")
-    return ["uxplay", "-n", name, "-nh", "-a", "-reset", "0", "-vs", sink]
+def serve(screen, port: int) -> None:
+    """Send each server that connects the current frame at once, then every new one.
+
+    A still phone sends no frames, so a server restarted in the meantime would otherwise wait for the screen to
+    change (GStreamer's tcpserversink only passes on frames made after a client connects).
+    """
+    with socket.create_server(("127.0.0.1", port)) as srv:
+        while True:
+            conn, _ = srv.accept()
+            threading.Thread(target=_feed, args=(screen, conn), daemon=True).start()
+
+
+def _feed(screen, conn: socket.socket) -> None:
+    sent = 0.0
+    with conn:
+        try:
+            while True:
+                updated, frame = screen.updated, screen.frame  # in this order a new frame may go twice, never 0 times
+                if frame is None and sent:
+                    return  # UxPlay went away: closing tells the server the phone is gone
+                if frame is not None and updated > sent:
+                    conn.sendall(frame)
+                    sent = updated
+                time.sleep(0.02)
+        except OSError:
+            pass  # the server went away
 
 
 def main() -> None:
@@ -27,13 +51,10 @@ def main() -> None:
     port = int(os.environ.get("MIRROR_PORT", 8891))
     data = Path(os.environ.get("HIDAGENT_DATA", Path.home() / ".hidagent"))
     data.mkdir(parents=True, exist_ok=True)
-    while True:
-        proc = subprocess.Popen(command(name, 8, 75, port))
-        (data / "uxplay.pid").write_text(str(proc.pid))
-        log.info("AirPlay receiver '%s' started (pid %d), frames on 127.0.0.1:%d", name, proc.pid, port)
-        code = proc.wait()
-        log.warning("AirPlay receiver exited (code %s), restarting", code)
-        time.sleep(1)
+    screen = Screen(name, pidfile=data / "uxplay.pid")
+    screen.start()
+    log.info("AirPlay receiver '%s': frames on 127.0.0.1:%d", name, port)
+    serve(screen, port)
 
 
 if __name__ == "__main__":

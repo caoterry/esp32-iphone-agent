@@ -54,6 +54,44 @@ class Device:
         return [line for _, line in self.sent]
 
 
+class Pointer(Device):
+    """A board whose pointer stops at the screen's edges, as iOS's does."""
+
+    def __init__(self, screen: Screen, width: int):
+        super().__init__(screen)
+        self.x, self.width = 0, width
+
+    async def send(self, line):
+        if line == "home":
+            self.x = 0
+        elif line.startswith("move"):
+            self.x = min(max(self.x + int(line.split()[1]), 0), self.width)
+        return await super().send(line)
+
+
+class Rendering(Pointer):
+    """The phone draws the pointer a moment after a move, so a move undone within that moment shows nothing."""
+
+    def __init__(self, screen: Screen, width: int):
+        super().__init__(screen, width)
+        self.mouse_works, self.drawn = False, 0  # frames come from render(), not from each move
+
+    async def send(self, line):
+        reply = await super().send(line)
+        if line.startswith("move"):
+            asyncio.get_running_loop().call_later(0.05, self.render)
+        return reply
+
+    def render(self):
+        if self.x != self.drawn:
+            self.drawn, self.screen.updated = self.x, time.time()
+
+
+@pytest.fixture(autouse=True)
+def quick_probe(monkeypatch):
+    monkeypatch.setattr(phone_module, "PROBE_WAIT", 0.3)
+
+
 def make_phone(tmp_path, age, mouse_works=True, mirroring=True):
     screen = Screen(age)
     screen.mirroring = mirroring
@@ -167,3 +205,38 @@ def test_the_agent_stops_instead_of_retrying_when_the_phone_is_unavailable():
     asyncio.run(agent._run())
     assert phone.taps == 1
     assert agent.steps[-1]["action"] == "error" and "unlock the phone" in agent.steps[-1]["reason"]
+
+
+def test_a_restarted_receiver_is_not_restarted_again_by_the_next_action(tmp_path, monkeypatch):
+    # the user may still be choosing Screen Mirroring again while a client retries
+    from hidagent.screen import Screen as Mirror
+    screen = Mirror()
+    screen.frame, screen.updated = b"\xff\xd8old\xff\xd9", time.time() - 300  # stuck for 5 minutes
+    restarts = []
+    monkeypatch.setattr(screen, "restart", lambda real=screen.restart: (restarts.append(1), real()))
+    phone = Phone(Device(screen, mouse_works=False), tmp_path / "calibration.json", screen)
+    phone.span = {"w": 460, "h": 1000}
+    for _ in range(2):
+        with pytest.raises(phone_module.PhoneUnavailable):
+            asyncio.run(phone.tap(0.5, 0.5))
+    assert len(restarts) == 1
+
+
+def test_the_probe_does_not_lose_track_of_the_pointer_at_the_right_edge(tmp_path):
+    screen = Screen(age=0)
+    device = Pointer(screen, width=460)
+    phone = Phone(device, tmp_path / "calibration.json", screen)
+    phone.span = {"w": 460, "h": 1000}
+    asyncio.run(phone.tap(1.0, 0.5))
+    screen.updated = time.time() - 30  # still since then: the next action probes first
+    asyncio.run(phone.tap(0.5, 0.5))
+    assert phone._pos[0] == device.x
+
+
+def test_a_phone_that_draws_the_pointer_a_moment_later_passes_the_probe(tmp_path):
+    screen = Screen(age=30)
+    device = Rendering(screen, width=460)
+    phone = Phone(device, tmp_path / "calibration.json", screen)
+    phone.span = {"w": 460, "h": 1000}
+    asyncio.run(phone.tap(0.5, 0.5))
+    assert device.lines[-1] == "click"

@@ -13,21 +13,19 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 
-def jpeg_sink(fps: int, quality: int, out: str) -> str:
-    """The GStreamer video sink UxPlay runs: JPEG frames at `fps`, written to `out`."""
-    return f"videorate drop-only=true ! video/x-raw,framerate={fps}/1 ! jpegenc quality={quality} ! {out}"
-
-
 class Screen:
     """The latest JPEG frame of the phone's screen, from UxPlay.
 
     By default the server runs UxPlay itself and reads frames from a pipe. With `stream` ("host:port") it follows
     a standalone receiver instead (`python -m hidagent.receiver`), so restarting the server does not end the
-    phone's Screen Mirroring session; `pidfile` is where that receiver records UxPlay's pid.
+    phone's Screen Mirroring session. `pidfile` is where UxPlay's pid is recorded, so a server following a
+    receiver can restart that receiver's UxPlay.
     """
 
     def __init__(self, name: str = "iPhone Agent", fps: int = 8, quality: int = 75,
                  stream: str | None = None, pidfile: Path | None = None):
+        if stream and not stream.rpartition(":")[2].isdigit():
+            raise ValueError(f"MIRROR_STREAM must be host:port, not {stream!r}")
         self.name, self.fps, self.quality = name, fps, quality
         self.stream, self.pidfile = stream, pidfile
         self.frame: bytes | None = None
@@ -38,18 +36,24 @@ class Screen:
         self._stopping = False
 
     def start(self) -> None:
-        threading.Thread(target=self._follow if self.stream else self._supervise, daemon=True).start()
+        self._thread = threading.Thread(target=self._follow if self.stream else self._supervise, daemon=True)
+        self._thread.start()
 
     def stop(self) -> None:
         self._stopping = True
         if self._proc:
             self._proc.terminate()
-        if self._sock:
-            self._sock.close()
+        sock = self._sock
+        if sock:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)  # wakes the follower's recv(); close() alone does not on Linux
+            except OSError:
+                pass
 
     def restart(self) -> None:
         """Restart UxPlay (its supervisor starts a new one); the phone must choose it in Screen Mirroring again."""
         log.warning("AirPlay receiver: no new frames, restarting it")
+        self.frame, self.updated = None, 0.0  # nothing since the restart: the next action must not restart it again
         if self.stream:
             if self._sock is None:  # the receiver is gone, so its pid may belong to an unrelated process by now
                 log.warning("no AirPlay receiver is streaming at %s: start `python -m hidagent.receiver`", self.stream)
@@ -64,15 +68,18 @@ class Screen:
     def _follow(self) -> None:
         """Read frames from the standalone receiver's TCP stream; reconnect whenever it goes away."""
         host, port = self.stream.rsplit(":", 1)
+        waiting = False
         while not self._stopping:
             try:
                 with socket.create_connection((host, int(port)), timeout=2) as sock:
                     sock.settimeout(None)
-                    self._sock = sock
+                    self._sock, waiting = sock, False
                     log.info("following the AirPlay receiver at %s", self.stream)
                     self._consume(lambda: sock.recv(1 << 16))
             except OSError:
-                pass
+                if not waiting:
+                    log.info("waiting for the AirPlay receiver at %s (python -m hidagent.receiver)", self.stream)
+                    waiting = True
             finally:
                 self._sock, self.frame = None, None
             time.sleep(0.5)
@@ -81,11 +88,14 @@ class Screen:
         """Keep UxPlay running: it exits on some disconnects, so restart it every time."""
         while not self._stopping:
             read_fd, write_fd = os.pipe()
-            sink = jpeg_sink(self.fps, self.quality, f"fdsink fd={write_fd}")
+            sink = (f"videorate drop-only=true ! video/x-raw,framerate={self.fps}/1 ! "
+                    f"jpegenc quality={self.quality} ! fdsink fd={write_fd}")
             self._proc = subprocess.Popen(
                 ["uxplay", "-n", self.name, "-nh", "-a", "-reset", "0", "-vs", sink],
                 pass_fds=(write_fd,))  # UxPlay logs to stdout: keep them in ours
             os.close(write_fd)
+            if self.pidfile:
+                Path(self.pidfile).write_text(str(self._proc.pid))
             log.info("AirPlay receiver '%s' started (pid %d)", self.name, self._proc.pid)
             self._read(read_fd)  # returns when UxPlay closes the pipe
             code = self._proc.wait()

@@ -189,3 +189,21 @@ def test_raw_board_commands_make_the_pointer_position_unknown(api, monkeypatch):
 
     asyncio.run(scenario())
     assert sent == ["move 40 0"] and calls == [("forget",)]
+
+
+def test_raw_board_commands_forget_the_pointer_even_when_the_board_errs(api, monkeypatch):
+    # the board may have moved the pointer before the reply timed out
+    from hidagent.device import DeviceError
+    module, calls = api
+
+    async def send(line):
+        raise DeviceError("board did not answer")
+    monkeypatch.setattr(module, "DEBUG", True)
+    monkeypatch.setattr(module, "device", type("D", (), {"send": staticmethod(send), "connected": True})())
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=module.app), base_url="http://legacy") as client:
+            assert (await client.post("/api/raw", json={"text": "move 40 0"})).status_code == 409
+
+    asyncio.run(scenario())
+    assert calls == [("forget",)]

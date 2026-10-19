@@ -158,7 +158,7 @@ Set in `server/.env` (see [`.env.example`](server/.env.example)):
 | `AIRPLAY_NAME` | `iPhone Agent` | Receiver name in the phone's Screen Mirroring list |
 | `HOST` | `127.0.0.1` | Address the web UI and API listen on (`0.0.0.0` opens them to the network, without a password) |
 | `PORT` / `DEVICE_PORT` | `8890` / `7300` | Web UI port / port the board connects to |
-| `MIRROR_STREAM` | — | Follow a standalone receiver (`127.0.0.1:8891`, see above) instead of running UxPlay as a child |
+| `MIRROR_STREAM` / `MIRROR_PORT` | — / `8891` | Follow a standalone receiver (`127.0.0.1:8891`, see above) instead of running UxPlay as a child / port that receiver serves frames on |
 | `HIDAGENT_DATA` | `~/.hidagent` | Calibration and debug traces |
 | `HIDAGENT_DEBUG` | `0` | Debug mode, see below |
 

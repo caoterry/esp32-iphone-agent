@@ -147,7 +147,7 @@ set -a && . ./.env && set +a && MIRROR_STREAM=127.0.0.1:8891 .venv/bin/python -m
 | `AIRPLAY_NAME` | `iPhone Agent` | 手机"屏幕镜像"列表里显示的名字 |
 | `HOST` | `127.0.0.1` | 网页和 API 监听的地址（`0.0.0.0` 对局域网开放，且没有密码） |
 | `PORT` / `DEVICE_PORT` | `8890` / `7300` | 网页端口 / 板子连接的端口 |
-| `MIRROR_STREAM` | — | 读取单独运行的接收端的画面（`127.0.0.1:8891`，见上文），不再由服务端自己启动 UxPlay |
+| `MIRROR_STREAM` / `MIRROR_PORT` | — / `8891` | 读取单独运行的接收端的画面（`127.0.0.1:8891`，见上文），不再由服务端自己启动 UxPlay / 接收端提供画面的端口 |
 | `HIDAGENT_DATA` | `~/.hidagent` | 校准数据和调试记录 |
 | `HIDAGENT_DEBUG` | `0` | 调试模式，见下文 |
 
