@@ -31,6 +31,16 @@ NUDGE = 12              # mouse units the pointer is wiggled by to find it on sc
 AIM_TOLERANCE = 0.008   # screen fraction; a bigger miss is corrected before pressing
 MAX_MISS = 0.06         # bigger misses are still corrected, but not learned from (they may be misreadings)
 HANDOFF_WAIT = 4.0      # seconds for Universal Clipboard to offer the Mac's new clipboard (1 s was too short)
+AIM_REJECT = 2 * MAX_MISS  # a pointer "found" farther than this is something else that moved (a clock hand)
+STALE_AFTER = 5.0       # seconds without a new frame before an action first checks that the phone still responds
+PROBE_WAIT = 1.5        # seconds a pointer wiggle gets to show up on the mirrored screen
+FROZEN_AFTER = 70.0     # no frame for this long: not even the status-bar clock changed, so the mirror is stuck
+LONG_MOVE = 0.3         # screen fraction; after a longer move the pointer gets a moment to settle before a click
+SETTLE_AFTER_LONG_MOVE = 0.15  # seconds
+
+
+class PhoneUnavailable(RuntimeError):
+    """The phone cannot be acted on right now (mirror frozen, phone locked, mouse ignored): say why, do nothing."""
 
 
 class Phone:
@@ -40,6 +50,7 @@ class Phone:
         saved = json.loads(calibration_file.read_text()) if calibration_file.exists() else None
         self.span = {"w": saved["w"], "h": saved["h"]} if saved else None
         self._pos = None  # pointer position in mouse units; None = unknown
+        self._last_move = 0.0  # length of the latest move, as a fraction of the screen
         self._moves = 0
         self._link = 0  # device.links when the pointer was last homed
         # where the pointer really landed (seen on screen) for the screen fraction we aimed at, per axis;
@@ -117,9 +128,36 @@ class Phone:
         """Calibration plus the observed landings, so the correction survives a restart."""
         self._file.write_text(json.dumps({**self.span, "seen": {k: list(v) for k, v in self._seen.items()}}))
 
+    def forget_position(self) -> None:
+        """The pointer was moved behind our back (raw board commands): start the next gesture from the corner."""
+        self._pos = None
+
+    async def ensure_live(self) -> None:
+        """Before acting on a screen that has been still for a while, wiggle the pointer and wait for the mirror to
+        show it, so a frozen mirror or a mouse the phone ignores is reported instead of tapped into blindly.
+        (A locked phone usually shows up earlier, as the board's "phone usb asleep" error.)"""
+        if self.screen is None or getattr(self.screen, "updated", None) is None:
+            return
+        if time.time() - self.screen.updated < STALE_AFTER:
+            return
+        sent = time.time()
+        await self.device.send(f"move {NUDGE} 0")
+        await self.device.send(f"move -{NUDGE} 0")
+        if await self.screen.fresh(sent, PROBE_WAIT):
+            return
+        if time.time() - self.screen.updated > FROZEN_AFTER:
+            self.screen.restart()
+            raise PhoneUnavailable("the mirrored screen stopped updating, so the AirPlay receiver was restarted: "
+                                   "unlock the phone if it is locked, then choose Control Center › Screen Mirroring › "
+                                   f"{getattr(self.screen, 'name', 'iPhone Agent')} again")
+        raise PhoneUnavailable("the pointer did not move on the mirrored screen: unlock the phone if it is locked; "
+                               "if it is unlocked, it is ignoring the board's mouse, so unplug the board's adapter "
+                               "from the phone and plug it back in")
+
     async def point(self, x: float, y: float, aim: bool = False) -> None:
         if not self.calibrated:
             raise RuntimeError("pointer not calibrated")
+        await self.ensure_live()
         await self._move_to(self._dx(x), self._dy(y))
         if aim and self.screen is not None:
             await self._aim(x, y)
@@ -144,6 +182,9 @@ class Phone:
             return
         fx, fy = found
         log.debug("aim (%.3f, %.3f): pointer at (%.3f, %.3f)", x, y, fx, fy)
+        if max(abs(fx - x), abs(fy - y)) > AIM_REJECT:  # something else moved; correcting toward it would mis-tap
+            log.info("aim (%.3f, %.3f): ignoring a pointer reading at (%.3f, %.3f), too far off", x, y, fx, fy)
+            return
         if max(abs(fx - x), abs(fy - y)) <= MAX_MISS:  # learn from normal drift only, never from a stray reading
             self._seen["x"].append((self._fix(x, "x"), fx))
             self._seen["y"].append((self._fix(y, "y"), fy))
@@ -176,6 +217,7 @@ class Phone:
             self._pos, self._moves = (0, 0), 0
         x, y = self._pos
         self._pos = None  # unknown until the move succeeds
+        self._last_move = max(abs(tx - x) / self.span["w"], abs(ty - y) / self.span["h"])
         await self.device.send(f"move {tx - x} {ty - y}")
         self._pos, self._moves = (tx, ty), self._moves + 1
 
@@ -189,6 +231,8 @@ class Phone:
     async def tap(self, x: float, y: float, aim: bool = False) -> None:
         """aim=True finds the pointer on screen first (slower); worth it when a tap just missed."""
         await self.point(x, y, aim)
+        if self._last_move > LONG_MOVE:  # let iOS finish moving the pointer, or the click can land on the way
+            await asyncio.sleep(SETTLE_AFTER_LONG_MOVE)
         await self.device.send("click")
         await asyncio.sleep(TAP_GAP)
 
@@ -217,6 +261,7 @@ class Phone:
 
     async def type(self, text: str) -> None:
         """ASCII is typed key by key; anything else (Chinese, emoji) is pasted through Universal Clipboard."""
+        await self.ensure_live()
         if text.isascii():
             await self.device.send(f"type {text}")
             return
@@ -229,6 +274,7 @@ class Phone:
         await self.device.send("key cmd+v")
 
     async def key(self, combo: str) -> None:
+        await self.ensure_live()
         await self.device.send(f"key {combo}")
 
     async def go_home(self) -> None:

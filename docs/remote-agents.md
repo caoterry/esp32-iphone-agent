@@ -19,7 +19,7 @@ iphone-agent --url http://127.0.0.1:8890 screenshot phone.jpg
 
 Use the actual server address if it runs elsewhere, including on a Raspberry Pi.
 `IPHONE_AGENT_URL` supplies the default; otherwise the bridge uses localhost.
-The legacy server has no authentication. Keep it on a trusted private network;
+The legacy server has no authentication, so it listens on this computer only unless `HOST` says otherwise;
 the bridge adds no public listener. Install without `[mcp]` if only the CLI is needed.
 
 Configure an MCP client to launch this command (stdio transport):

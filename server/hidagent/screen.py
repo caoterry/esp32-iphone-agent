@@ -29,6 +29,12 @@ class Screen:
         if self._proc:
             self._proc.terminate()
 
+    def restart(self) -> None:
+        """Restart UxPlay (the supervisor starts a new one); the phone must choose it in Screen Mirroring again."""
+        if self._proc and self._proc.poll() is None:
+            log.warning("AirPlay receiver: no new frames, restarting it")
+            self._proc.terminate()
+
     def _supervise(self) -> None:
         """Keep UxPlay running: it exits on some disconnects, so restart it every time."""
         while not self._stopping:

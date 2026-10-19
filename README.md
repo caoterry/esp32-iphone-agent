@@ -107,7 +107,8 @@ cp .env.example .env         # set LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
 set -a && . ./.env && set +a && .venv/bin/python -m hidagent
 ```
 
-Open `http://<computer-ip>:8890` in a browser.
+Open `http://127.0.0.1:8890` in a browser. The server listens on this computer only, because it has no password;
+set `HOST=0.0.0.0` to open it to your network.
 
 ### 3. Set up the phone (once)
 
@@ -147,6 +148,7 @@ Set in `server/.env` (see [`.env.example`](server/.env.example)):
 | `LLM_TOKEN_PARAM` | `auto` | Token-limit field: `max_tokens`, `max_completion_tokens` (newer OpenAI models), or `auto` to detect |
 | `ACTOR_*` / `PLANNER_*` | — | Per-role overrides of any `LLM_*` variable |
 | `AIRPLAY_NAME` | `iPhone Agent` | Receiver name in the phone's Screen Mirroring list |
+| `HOST` | `127.0.0.1` | Address the web UI and API listen on (`0.0.0.0` opens them to the network, without a password) |
 | `PORT` / `DEVICE_PORT` | `8890` / `7300` | Web UI port / port the board connects to |
 | `HIDAGENT_DATA` | `~/.hidagent` | Calibration and debug traces |
 | `HIDAGENT_DEBUG` | `0` | Debug mode, see below |

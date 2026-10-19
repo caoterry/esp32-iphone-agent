@@ -174,7 +174,11 @@ async def raw(t: Text):
     """Debug only: send one protocol line to the board as-is."""
     if not DEBUG:
         raise HTTPException(404)
-    return await act(lambda: device.send(t.text))
+
+    async def send():
+        await device.send(t.text)
+        phone.forget_position()  # the server no longer knows where the pointer is
+    return await act(send)
 
 
 @app.post("/api/calibrate/start")
