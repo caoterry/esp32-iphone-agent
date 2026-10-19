@@ -101,7 +101,15 @@ cp .env.example .env         # 填 LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
 set -a && . ./.env && set +a && .venv/bin/python -m hidagent
 ```
 
-浏览器打开 `http://<电脑 IP>:8890`。
+如果想在重启服务端（比如改完代码）时不断开手机的屏幕镜像，可以在另一个终端里单独运行 AirPlay 接收端，
+让服务端去读它的画面（两条命令都在 `server/` 下运行）：
+
+```bash
+set -a && . ./.env && set +a && .venv/bin/python -m hidagent.receiver                          # 只需一次，保持运行
+set -a && . ./.env && set +a && MIRROR_STREAM=127.0.0.1:8891 .venv/bin/python -m hidagent      # 可以随便重启
+```
+
+浏览器打开 `http://127.0.0.1:8890`。服务端没有密码，所以默认只监听本机；设置 `HOST=0.0.0.0` 才会对局域网开放。
 
 ### 3. 设置手机（只需一次）
 
@@ -137,7 +145,9 @@ set -a && . ./.env && set +a && .venv/bin/python -m hidagent
 | `LLM_TOKEN_PARAM` | `auto` | 输出长度参数名：`max_tokens`、`max_completion_tokens`（新版 OpenAI 模型），或 `auto` 自动识别 |
 | `ACTOR_*` / `PLANNER_*` | — | 单独覆盖执行模型 / 规划模型的任意 `LLM_*` 配置 |
 | `AIRPLAY_NAME` | `iPhone Agent` | 手机"屏幕镜像"列表里显示的名字 |
+| `HOST` | `127.0.0.1` | 网页和 API 监听的地址（`0.0.0.0` 对局域网开放，且没有密码） |
 | `PORT` / `DEVICE_PORT` | `8890` / `7300` | 网页端口 / 板子连接的端口 |
+| `MIRROR_STREAM` | — | 读取单独运行的接收端的画面（`127.0.0.1:8891`，见上文），不再由服务端自己启动 UxPlay |
 | `HIDAGENT_DATA` | `~/.hidagent` | 校准数据和调试记录 |
 | `HIDAGENT_DEBUG` | `0` | 调试模式，见下文 |
 

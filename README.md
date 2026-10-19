@@ -108,11 +108,11 @@ set -a && . ./.env && set +a && .venv/bin/python -m hidagent
 ```
 
 To keep the phone's Screen Mirroring session while you restart the server (e.g. after changing code), run the
-AirPlay receiver on its own and let the server follow it:
+AirPlay receiver on its own in a second terminal and let the server follow it (both from `server/`):
 
 ```bash
-(cd server && set -a && . ./.env && set +a && nohup .venv/bin/python -m hidagent.receiver &)   # once; keeps running
-MIRROR_STREAM=127.0.0.1:8891 .venv/bin/python -m hidagent                                     # restart freely
+set -a && . ./.env && set +a && .venv/bin/python -m hidagent.receiver                          # once; leave it running
+set -a && . ./.env && set +a && MIRROR_STREAM=127.0.0.1:8891 .venv/bin/python -m hidagent      # restart freely
 ```
 
 Open `http://127.0.0.1:8890` in a browser. The server listens on this computer only, because it has no password;
@@ -158,6 +158,7 @@ Set in `server/.env` (see [`.env.example`](server/.env.example)):
 | `AIRPLAY_NAME` | `iPhone Agent` | Receiver name in the phone's Screen Mirroring list |
 | `HOST` | `127.0.0.1` | Address the web UI and API listen on (`0.0.0.0` opens them to the network, without a password) |
 | `PORT` / `DEVICE_PORT` | `8890` / `7300` | Web UI port / port the board connects to |
+| `MIRROR_STREAM` | — | Follow a standalone receiver (`127.0.0.1:8891`, see above) instead of running UxPlay as a child |
 | `HIDAGENT_DATA` | `~/.hidagent` | Calibration and debug traces |
 | `HIDAGENT_DEBUG` | `0` | Debug mode, see below |
 
