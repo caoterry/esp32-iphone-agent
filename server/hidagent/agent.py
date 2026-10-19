@@ -11,7 +11,7 @@ from . import vision
 from .debug import Trace
 from .device import DeviceError
 from .llm import LLM
-from .phone import Phone
+from .phone import Phone, PhoneUnavailable
 from .screen import Screen
 
 log = logging.getLogger(__name__)
@@ -185,7 +185,7 @@ class Agent:
                     if await self._step():
                         return
                     failures = 0
-                except BlindError:
+                except (BlindError, PhoneUnavailable):  # needs the user, not another try
                     raise
                 except Exception as e:  # a bad reply or a dropped link: recover, don't crash
                     self._record(action="hiccup", reason=str(e)[:300])

@@ -136,3 +136,34 @@ def test_the_pointer_settles_after_a_long_move_before_clicking(tmp_path):
     times = {line: t for t, line in device.sent}
     last_move = max(t for t, line in device.sent if line.startswith("move"))
     assert times["click"] - last_move >= phone_module.SETTLE_AFTER_LONG_MOVE * 0.9
+
+
+def test_the_agent_stops_instead_of_retrying_when_the_phone_is_unavailable():
+    # retrying cannot unlock the phone or restart Screen Mirroring: it only spends model calls
+    from hidagent.agent import Agent
+    from hidagent.debug import Trace
+
+    class Mirror:
+        live, frame, aspect = True, b"jpeg", 0.46
+
+        async def settled(self, **_):
+            pass
+
+    class Unavailable:
+        taps = 0
+
+        async def tap(self, x, y, aim=False):
+            self.taps += 1
+            raise phone_module.PhoneUnavailable("unlock the phone")
+
+    class Model:
+        model = "fake"
+
+        async def chat(self, system, text, image=None, max_tokens=600, temperature=0):
+            return "THINK: tap it\nDO: tap 500 500" if "Next action?" in text else "1. Tap it"
+
+    phone = Unavailable()
+    agent = Agent(phone=phone, screen=Mirror(), actor=Model(), planner=Model(), trace=Trace(None))
+    asyncio.run(agent._run())
+    assert phone.taps == 1
+    assert agent.steps[-1]["action"] == "error" and "unlock the phone" in agent.steps[-1]["reason"]
